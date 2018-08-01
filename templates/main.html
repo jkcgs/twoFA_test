@@ -1,0 +1,73 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>body { font-family: "Roboto", "Lucida Grande", Verdana, Arial, sans-serif; }</style>
+</head>
+<body>
+    <h3>TOTP (two factor auth) test</h3>
+
+    <div>Secret: <span id="secret"></span></div>
+    <div>Code: <code id="fcode"></code></div>
+    <div>Backend code: <code id="bcode"></code></div>
+    <div>Remaining: <span id="remain"></span>s</div>
+    <div style="padding: 1rem" id="qr"></div>
+
+    <form onsubmit="verify(); return false">
+        <h4>Verify</h4>
+        <label>Code: <input type="text" required maxlength="6" minlength="6"></label>
+        <input type="submit" value="Test" id="verif">
+    </form>
+
+    <script src="{% static '/js/jquery-3.3.1.min.js' %}"></script>
+    <script src="{% static '/js/jsotp.js' %}"></script>
+    <script src="{% static '/js/qrcode.js' %}"></script>
+    <script src="{% static '/js/base32.js' %}"></script>
+    <script src="{% static '/js/random_str.js' %}"></script>
+    <script>
+        var otp = new jsOTP.totp();
+        var secret = encode32(random_str(10));
+        new QRCode(q('#qr'), 'otpauth://totp/djtest?secret=' + secret);
+        q('#secret').innerText = secret;
+
+        update();
+        updateRemaining();
+
+        function q(e) { return document.querySelector(e); }
+
+        function verify() {
+            $.post('{% url 'verify' %}', {'secret': secret, 'code': q('#verif').value}, function(result){
+                if (result === 'True' || result === 'False') {
+                    alert('Valid: ' + result);
+                } else {
+                    alert('Shit happens: ' + result);
+                }
+            });
+        }
+
+        function updateRemaining() {
+            q('#remain').innerText = getRemaining();
+            setTimeout(updateRemaining, 1000);
+        }
+
+        function getRemaining() {
+            return 30 - ((new Date()).getSeconds() % 30);
+        }
+
+        function update() {
+            $.post('{% url 'otp' %}', {'secret': secret}, function(result){
+                q('#fcode').innerText = otp.getOtp(secret);
+                q('#bcode').innerText = result;
+
+                var rem = Math.max(getRemaining(), 0);
+                setTimeout(update, 1000 * rem);
+            });
+        }
+    </script>
+</body>
+</html>
